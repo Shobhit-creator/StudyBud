@@ -21,15 +21,18 @@ from django.http import HttpResponse
 # ]
 
 # always write function name in small letter and class name start with capital letter
+
+
 def loginPage(request):
 
     page = 'login'
 
-    if request.user.is_authenticated:# redirecting user to home page if he already logged in.
+    # redirecting user to home page if he already logged in.
+    if request.user.is_authenticated:
         return redirect('home')
 
-    if request.method=='POST':
-        username = request.POST.get('email').lower()# to get user lowercase
+    if request.method == 'POST':
+        username = request.POST.get('email').lower()  # to get user lowercase
         password = request.POST.get('password')
 
         try:
@@ -46,19 +49,21 @@ def loginPage(request):
     context = {'page': page}
     return render(request, 'base/login_register.html', context)
 
+
 def logoutUser(request):
     logout(request)
     return redirect('home')
 
+
 def registerPage(request):
     form = MyUserCreationForm()
     if request.method == 'POST':
-        form = UserCreationForm(request.POST)
+        form = MyUserCreationForm(request.POST)
         if form.is_valid():
-            user = form.save(commit=False)#to get the user rightaway
+            user = form.save(commit=False)  # to get the user rightaway
             user.username = user.username.lower()
             user.save()
-            login(request, user)# user logged in then sending to home page
+            login(request, user)  # user logged in then sending to home page
             return redirect('home')
         else:
             messages.error("An error occured during registration")
@@ -66,34 +71,38 @@ def registerPage(request):
     return render(request, 'base/login_register.html', context)
 
 
-
-
 def home(request):
-    q = request.GET.get('q') if request.GET.get('q')!=None else ''
+    q = request.GET.get('q') if request.GET.get('q') != None else ''
     rooms = Room.objects.filter(
-            Q(topic__name__icontains=q) |
-            Q(name__icontains=q) |
-            Q(description__icontains=q) #here matching with description attribute with query 
-            )
+        Q(topic__name__icontains=q) |
+        Q(name__icontains=q) |
+        # here matching with description attribute with query
+        Q(description__icontains=q)
+    )
     topics = Topic.objects.all()[0:5]
-    rooms_count = rooms.count()# count method of list which is faster than the len method of list
-    room_messages =  Message.objects.filter(Q(room__topic__name__icontains=q))
-    context = {'rooms': rooms, 'topics': topics, 'rooms_count': rooms_count, 'room_messages': room_messages}
+    # count method of list which is faster than the len method of list
+    rooms_count = rooms.count()
+    room_messages = Message.objects.filter(Q(room__topic__name__icontains=q))
+    context = {'rooms': rooms, 'topics': topics,
+               'rooms_count': rooms_count, 'room_messages': room_messages}
     return render(request, 'base/home.html', context)
+
 
 def room(request, pk):
     room = Room.objects.get(id=pk)
-    room_messages = room.message_set.all()#Many to one relationship https://stackoverflow.com/questions/42080864/set-in-django-for-a-queryset
+    # Many to one relationship https://stackoverflow.com/questions/42080864/set-in-django-for-a-queryset
+    room_messages = room.message_set.all()
     participants = room.participants.all()
     if request.method == 'POST':
         message = Message.objects.create(
-            user = request.user,
-            room = room,
-            body = request.POST.get('body')
+            user=request.user,
+            room=room,
+            body=request.POST.get('body')
         )
         room.participants.add(request.user)
         return redirect('room', pk=room.id)
-    context = {'room': room, 'room_messages': room_messages, 'participants': participants}         
+    context = {'room': room, 'room_messages': room_messages,
+               'participants': participants}
     return render(request, 'base/room.html', context)
 
 
@@ -102,8 +111,10 @@ def userProfile(request, pk):
     topics = Topic.objects.all()
     rooms = user.room_set.all()
     room_messages = user.message_set.all()
-    context = {'user': user, 'rooms': rooms, 'topics': topics, 'room_messages': room_messages}
+    context = {'user': user, 'rooms': rooms,
+               'topics': topics, 'room_messages': room_messages}
     return render(request, 'base/profile.html', context)
+
 
 @login_required(login_url='login')
 def createRoom(request):
@@ -112,13 +123,14 @@ def createRoom(request):
     if request.method == 'POST':
         form = RoomForm(request.POST)
         topic_name = request.POST.get('topic')
-        topic, created = Topic.objects.get_or_create(name=topic_name)# created will evaluate to false if create else true if select
-        
+        # created will evaluate to false if create else true if select
+        topic, created = Topic.objects.get_or_create(name=topic_name)
+
         Room.objects.create(
             host=request.user,
             topic=topic,
-            name = request.POST.get('name'),
-            description = request.POST.get('description'),
+            name=request.POST.get('name'),
+            description=request.POST.get('description'),
         )
 
         return redirect('home')
@@ -129,29 +141,31 @@ def createRoom(request):
         #     room.save()
         #     return redirect('home')#here home is the name of the home route in the urls.py
 
-
-    context = {'form': form, 'topics':topics}
+    context = {'form': form, 'topics': topics}
     return render(request, 'base/room_form.html', context)
+
 
 @login_required(login_url='login')
 def updateRoom(request, pk):
-    room =  Room.objects.get(id=pk)
+    room = Room.objects.get(id=pk)
     form = RoomForm(instance=room)
     topics = Topic.objects.all()
 
     if request.user != room.host:
-        return HttpResponse("Your are not allowed here!!")#wtih this we are not allow one user to edit or delete room of other user
-    
+        # wtih this we are not allow one user to edit or delete room of other user
+        return HttpResponse("Your are not allowed here!!")
+
     if request.method == 'POST':
         topic_name = request.POST.get('topic')
         topic, created = Topic.objects.get_or_create(name=topic_name)
         room.name = request.POST.get('name')
-        room.topic = topic 
+        room.topic = topic
         room.description = request.POST.get('description')
         room.save()
         return redirect('home')
-    context = {'form':form, 'topics': topics, 'room':room}
+    context = {'form': form, 'topics': topics, 'room': room}
     return render(request, 'base/room_form.html', context)
+
 
 @login_required(login_url='login')
 def deleteRoom(request, pk):
@@ -165,6 +179,7 @@ def deleteRoom(request, pk):
         return redirect('home')
     return render(request, 'base/delete.html', {'obj': room})
 
+
 @login_required(login_url='login')
 def deleteMessage(request, pk):
     message = Message.objects.get(id=pk)
@@ -176,6 +191,7 @@ def deleteMessage(request, pk):
         message.delete()
         return redirect('home')
     return render(request, 'base/delete.html', {'obj': message})
+
 
 @login_required(login_url='login')
 def updateUser(request):
@@ -190,14 +206,11 @@ def updateUser(request):
 
 
 def topicsPage(request):
-    q = request.GET.get('q') if request.GET.get('q')!=None else ''
+    q = request.GET.get('q') if request.GET.get('q') != None else ''
     topics = Topic.objects.filter(name__icontains=q)
     return render(request, 'base/topics.html', {'topics': topics})
+
 
 def activityPage(request):
     room_messages = Message.objects.all()
     return render(request, 'base/activity.html', {'room_messages': room_messages})
-
-
-
-
